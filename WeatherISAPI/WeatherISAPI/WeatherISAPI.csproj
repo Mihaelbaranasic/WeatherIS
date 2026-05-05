@@ -10,4 +10,10 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\WeatherISCore\WeatherISCore.csproj" />
+    <ProjectReference Include="..\WeatherISML\WeatherISML.csproj" />
+    <ProjectReference Include="..\WheatherISDB\WheatherISDB.csproj" />
+  </ItemGroup>
+
 </Project>
