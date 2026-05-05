@@ -2,5 +2,5 @@
   <Project Path="WeatherISAPI/WeatherISAPI.csproj" />
   <Project Path="WeatherISCore/WeatherISCore.csproj" />
   <Project Path="WeatherISML/WeatherISML.csproj" />
-  <Project Path="WheatherISDB/WheatherISDB.csproj" />
+  <Project Path="WheatherISDB/WeatherISDB.csproj" />
 </Solution>

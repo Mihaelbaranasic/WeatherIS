@@ -7,13 +7,18 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+	  <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.26" />
+	  <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\WeatherISCore\WeatherISCore.csproj" />
     <ProjectReference Include="..\WeatherISML\WeatherISML.csproj" />
-    <ProjectReference Include="..\WheatherISDB\WheatherISDB.csproj" />
+    <ProjectReference Include="..\WheatherISDB\WeatherISDB.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Controllers\" />
   </ItemGroup>
 
 </Project>
