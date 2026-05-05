@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using WeatherISAPI.Hubs;
+using WeatherISAPI.Services;
+using WeatherISCore.Interfaces;
 using WeatherISDB;
 using WeatherISDB.Repositories;
-using WeatherISCore.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -30,6 +32,8 @@ builder.Services.AddCors(options =>
               .AllowCredentials();
     });
 });
+builder.Services.AddSignalR();
+builder.Services.AddHostedService<IoTSimulatorService>();
 
 var app = builder.Build();
 
@@ -43,5 +47,6 @@ app.UseHttpsRedirection();
 app.UseCors("ReactPolicy");
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<SensorHub>("/hubs/sensor");
 
 app.Run();
