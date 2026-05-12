@@ -4,6 +4,7 @@ using WeatherISAPI.Services;
 using WeatherISCore.Interfaces;
 using WeatherISDB;
 using WeatherISDB.Repositories;
+using WeatherISML.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +21,8 @@ builder.Services.AddScoped<ISensorRepository, SensorRepository>();
 builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
 builder.Services.AddScoped<IPredictionRepository, PredictionRepository>();
 builder.Services.AddScoped<IAlertRepository, AlertRepository>();
+// ML servis
+builder.Services.AddSingleton<WeatherPredictionService>();
 
 // CORS za React
 builder.Services.AddCors(options =>
