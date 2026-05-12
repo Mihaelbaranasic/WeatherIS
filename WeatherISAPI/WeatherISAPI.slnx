@@ -1,4 +1,8 @@
 <Solution>
+  <Project Path="WeatherIS-client/weatheris-client.esproj">
+    <Build />
+    <Deploy />
+  </Project>
   <Project Path="WeatherISAPI/WeatherISAPI.csproj" />
   <Project Path="WeatherISCore/WeatherISCore.csproj" />
   <Project Path="WeatherISML/WeatherISML.csproj" />
