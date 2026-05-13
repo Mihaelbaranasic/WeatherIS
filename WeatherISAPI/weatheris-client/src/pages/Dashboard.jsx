@@ -1,83 +1,122 @@
-import { useState, useEffect, useRef } from 'react'
-import { sensorService, measurementService } from '../services/api'
+import { useState, useEffect } from 'react'
+import { weatherService } from '../services/api'
 
 function Dashboard() {
-    const [sensors, setSensors] = useState([])
-    const [latestMeasurements, setLatestMeasurements] = useState({})
+    const [sensorData, setSensorData] = useState([])
     const [loading, setLoading] = useState(true)
-    const mountedRef = useRef(true)
+    const [lastUpdate, setLastUpdate] = useState(null)
 
     useEffect(() => {
-        mountedRef.current = true
-
         const fetchData = async () => {
             try {
-                const sensorsRes = await sensorService.getActive()
-                if (!mountedRef.current) return
-                setSensors(sensorsRes.data)
-
-                const measurements = {}
-                for (const sensor of sensorsRes.data) {
-                    try {
-                        const res = await measurementService.getLatest(sensor.id)
-                        measurements[sensor.id] = res.data
-                    } catch {
-                        measurements[sensor.id] = null
-                    }
-                }
-                if (!mountedRef.current) return
-                setLatestMeasurements(measurements)
+                const res = await weatherService.getCurrentAll()
+                setSensorData(res.data)
+                setLastUpdate(new Date())
             } catch (err) {
                 console.error('Greška:', err)
             } finally {
-                if (mountedRef.current) setLoading(false)
+                setLoading(false)
             }
         }
 
         fetchData()
-        const interval = setInterval(fetchData, 30000)
-
-        return () => {
-            mountedRef.current = false
-            clearInterval(interval)
-        }
+        const interval = setInterval(fetchData, 60000)
+        return () => clearInterval(interval)
     }, [])
 
-    if (loading) return <p>Učitavanje...</p>
+    if (loading) return (
+        <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+                <div className="text-4xl mb-4">⚡</div>
+                <p style={{ color: 'var(--text-secondary)' }}>Dohvaćanje podataka s OpenMeteo...</p>
+            </div>
+        </div>
+    )
 
     return (
-        <div style={{ padding: '20px' }}>
-            <h1>Dashboard</h1>
-            <p>Aktivni senzori: {sensors.length}</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
-                {sensors.map(sensor => {
-                    const m = latestMeasurements[sensor.id]
-                    return (
-                        <div key={sensor.id} style={{
-                            border: '1px solid #ccc',
-                            borderRadius: '8px',
-                            padding: '16px',
-                            minWidth: '220px'
-                        }}>
-                            <h3>{sensor.name}</h3>
-                            <p style={{ color: '#666', fontSize: '14px' }}>{sensor.location}</p>
-                            {m ? (
-                                <>
-                                    <p>🌡️ Temperatura: <strong>{m.temperature}°C</strong></p>
-                                    <p>💧 Vlažnost: <strong>{m.humidity}%</strong></p>
-                                    <p>🌬️ Tlak: <strong>{m.pressure} hPa</strong></p>
-                                    <p>💨 Vjetar: <strong>{m.windSpeed} km/h</strong></p>
-                                    <p style={{ fontSize: '12px', color: '#999' }}>
-                                        {new Date(m.timestamp).toLocaleString('hr-HR')}
-                                    </p>
-                                </>
-                            ) : (
-                                <p>Nema podataka</p>
-                            )}
-                        </div>
-                    )
-                })}
+        <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+                <div>
+                    <h1 className="text-2xl font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
+                        Dashboard
+                    </h1>
+                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                        {sensorData.length} aktivnih senzora
+                        {lastUpdate && ` · Ažurirano ${lastUpdate.toLocaleTimeString('hr-HR')}`}
+                    </p>
+                </div>
             </div>
+
+            {sensorData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20">
+                    <div className="text-5xl mb-4">🌐</div>
+                    <p className="text-lg font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+                        Nema aktivnih senzora
+                    </p>
+                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                        Dodaj senzore na stranici Senzori.
+                    </p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {sensorData.map(item => (
+                        <div key={item.sensorId}
+                            className="rounded-xl p-4 border transition-all duration-200 hover:scale-105 cursor-pointer"
+                            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+
+                            <div className="flex items-start justify-between mb-3">
+                                <div>
+                                    <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+                                        {item.sensorName}
+                                    </h3>
+                                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                                        {item.location}
+                                    </p>
+                                </div>
+                                <span className="text-xs px-2 py-1 rounded-full"
+                                    style={{ background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent-green)' }}>
+                                    ● Live
+                                </span>
+                            </div>
+
+                            <div className="text-3xl font-bold mb-3" style={{ color: 'var(--accent-blue)' }}>
+                                {item.weather.temperature}°C
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div className="rounded-lg p-2" style={{ background: 'var(--bg-secondary)' }}>
+                                    <div style={{ color: 'var(--text-secondary)' }}>Vlažnost</div>
+                                    <div className="font-medium mt-0.5" style={{ color: 'var(--text-primary)' }}>
+                                        {item.weather.humidity}%
+                                    </div>
+                                </div>
+                                <div className="rounded-lg p-2" style={{ background: 'var(--bg-secondary)' }}>
+                                    <div style={{ color: 'var(--text-secondary)' }}>Tlak</div>
+                                    <div className="font-medium mt-0.5" style={{ color: 'var(--text-primary)' }}>
+                                        {item.weather.pressure} hPa
+                                    </div>
+                                </div>
+                                <div className="rounded-lg p-2" style={{ background: 'var(--bg-secondary)' }}>
+                                    <div style={{ color: 'var(--text-secondary)' }}>Vjetar</div>
+                                    <div className="font-medium mt-0.5" style={{ color: 'var(--text-primary)' }}>
+                                        {item.weather.windSpeed} km/h
+                                    </div>
+                                </div>
+                                <div className="rounded-lg p-2" style={{ background: 'var(--bg-secondary)' }}>
+                                    <div style={{ color: 'var(--text-secondary)' }}>Oborine</div>
+                                    <div className="font-medium mt-0.5" style={{ color: 'var(--text-primary)' }}>
+                                        {item.weather.precipitation} mm
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p className="text-xs mt-3" style={{ color: 'var(--text-secondary)' }}>
+                                {new Date(item.weather.timestamp).toLocaleString('hr-HR')}
+                            </p>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     )
 }

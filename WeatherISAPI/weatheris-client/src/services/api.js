@@ -17,18 +17,18 @@ export const sensorService = {
     toggle: (id) => api.patch(`/sensors/${id}/toggle`)
 }
 
-export const measurementService = {
-    getBySensor: (sensorId) => api.get(`/measurements/sensor/${sensorId}`),
-    getLatest: (sensorId) => api.get(`/measurements/sensor/${sensorId}/latest`),
-    getByRange: (sensorId, from, to) =>
-        api.get(`/measurements/sensor/${sensorId}/range`, { params: { from, to } })
+export const weatherService = {
+    getCurrentAll: () => api.get('/weather/current'),
+    getCurrent: (sensorId) => api.get(`/weather/current/${sensorId}`),
+    getHistory: (sensorId, days = 30) => api.get(`/weather/history/${sensorId}`, { params: { days } })
 }
 
 export const predictionService = {
-    generate: (sensorId, horizon = 24) =>
+    generate: (sensorId, horizon = 384) =>
         api.post(`/predictions/sensor/${sensorId}`, null, { params: { horizon } }),
     getBySensor: (sensorId) => api.get(`/predictions/sensor/${sensorId}`),
-    evaluate: (sensorId) => api.get(`/predictions/sensor/${sensorId}/evaluate`)
+    evaluate: (sensorId) => api.get(`/predictions/sensor/${sensorId}/evaluate`),
+    getComparison: (sensorId) => api.get(`/predictions/compare/${sensorId}`)
 }
 
 export const alertService = {

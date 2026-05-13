@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using WeatherISDB;
 
@@ -11,9 +12,11 @@ using WeatherISDB;
 namespace WeatherISDB.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260513182039_AddSourceToMeasurements")]
+    partial class AddSourceToMeasurements
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -22,7 +25,7 @@ namespace WeatherISDB.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
-            modelBuilder.Entity("WeatherISCore.Entities.Alert", b =>
+            modelBuilder.Entity("Measurement", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -30,34 +33,42 @@ namespace WeatherISDB.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<bool>("IsResolved")
-                        .HasColumnType("bit");
-
-                    b.Property<double>("MeasuredValue")
+                    b.Property<double>("Humidity")
                         .HasColumnType("float");
 
-                    b.Property<string>("Parameter")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                    b.Property<double>("Precipitation")
+                        .HasColumnType("float");
+
+                    b.Property<double>("Pressure")
+                        .HasColumnType("float");
 
                     b.Property<int>("SensorId")
                         .HasColumnType("int");
 
-                    b.Property<double>("ThresholdValue")
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<double>("Temperature")
                         .HasColumnType("float");
 
-                    b.Property<DateTime>("TriggeredAt")
+                    b.Property<DateTime>("Timestamp")
                         .HasColumnType("datetime2");
+
+                    b.Property<double>("WindDirection")
+                        .HasColumnType("float");
+
+                    b.Property<double>("WindSpeed")
+                        .HasColumnType("float");
 
                     b.HasKey("Id");
 
                     b.HasIndex("SensorId");
 
-                    b.ToTable("Alerts");
+                    b.ToTable("Measurements");
                 });
 
-            modelBuilder.Entity("WeatherISCore.Entities.Prediction", b =>
+            modelBuilder.Entity("Prediction", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -98,6 +109,41 @@ namespace WeatherISDB.Migrations
                     b.ToTable("Predictions");
                 });
 
+            modelBuilder.Entity("WeatherISCore.Entities.Alert", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("IsResolved")
+                        .HasColumnType("bit");
+
+                    b.Property<double>("MeasuredValue")
+                        .HasColumnType("float");
+
+                    b.Property<string>("Parameter")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int>("SensorId")
+                        .HasColumnType("int");
+
+                    b.Property<double>("ThresholdValue")
+                        .HasColumnType("float");
+
+                    b.Property<DateTime>("TriggeredAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SensorId");
+
+                    b.ToTable("Alerts");
+                });
+
             modelBuilder.Entity("WeatherISCore.Entities.Sensor", b =>
                 {
                     b.Property<int>("Id")
@@ -133,6 +179,28 @@ namespace WeatherISDB.Migrations
                     b.ToTable("Sensors");
                 });
 
+            modelBuilder.Entity("Measurement", b =>
+                {
+                    b.HasOne("WeatherISCore.Entities.Sensor", "Sensor")
+                        .WithMany("Measurements")
+                        .HasForeignKey("SensorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Sensor");
+                });
+
+            modelBuilder.Entity("Prediction", b =>
+                {
+                    b.HasOne("WeatherISCore.Entities.Sensor", "Sensor")
+                        .WithMany()
+                        .HasForeignKey("SensorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Sensor");
+                });
+
             modelBuilder.Entity("WeatherISCore.Entities.Alert", b =>
                 {
                     b.HasOne("WeatherISCore.Entities.Sensor", "Sensor")
@@ -144,15 +212,9 @@ namespace WeatherISDB.Migrations
                     b.Navigation("Sensor");
                 });
 
-            modelBuilder.Entity("WeatherISCore.Entities.Prediction", b =>
+            modelBuilder.Entity("WeatherISCore.Entities.Sensor", b =>
                 {
-                    b.HasOne("WeatherISCore.Entities.Sensor", "Sensor")
-                        .WithMany()
-                        .HasForeignKey("SensorId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Sensor");
+                    b.Navigation("Measurements");
                 });
 #pragma warning restore 612, 618
         }

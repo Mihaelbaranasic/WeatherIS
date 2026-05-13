@@ -9,7 +9,6 @@ namespace WeatherISDB
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
         public DbSet<Sensor> Sensors { get; set; }
-        public DbSet<Measurement> Measurements { get; set; }
         public DbSet<Prediction> Predictions { get; set; }
         public DbSet<Alert> Alerts { get; set; }
 
@@ -24,15 +23,6 @@ namespace WeatherISDB
                 entity.Property(s => s.Location).IsRequired().HasMaxLength(200);
                 entity.Property(s => s.Latitude).IsRequired();
                 entity.Property(s => s.Longitude).IsRequired();
-            });
-
-            modelBuilder.Entity<Measurement>(entity =>
-            {
-                entity.HasKey(m => m.Id);
-                entity.HasOne(m => m.Sensor)
-                      .WithMany(s => s.Measurements)
-                      .HasForeignKey(m => m.SensorId)
-                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<Prediction>(entity =>

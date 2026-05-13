@@ -1,7 +1,7 @@
 ﻿using Microsoft.ML;
 using Microsoft.ML.Transforms.TimeSeries;
+using WeatherISCore.DTOs;
 using WeatherISML.Models;
-using WeatherISCore.Entities;
 
 namespace WeatherISML.Services
 {
@@ -17,10 +17,10 @@ namespace WeatherISML.Services
         }
 
         public PredictionOutput PredictTemperature(
-            IEnumerable<Measurement> measurements,
+            IEnumerable<WeatherDataDto> weatherData,
             int horizon = 24)
         {
-            var data = measurements
+            var data = weatherData
                 .OrderBy(m => m.Timestamp)
                 .Select(m => new MeasurementInput
                 {
@@ -30,7 +30,7 @@ namespace WeatherISML.Services
                     WindSpeed = (float)m.WindSpeed
                 }).ToList();
 
-            if (data.Count < 10)
+            if (data.Count < 12)
             {
                 return new PredictionOutput
                 {
@@ -45,8 +45,8 @@ namespace WeatherISML.Services
             var pipeline = _mlContext.Forecasting.ForecastBySsa(
                 outputColumnName: "Score",
                 inputColumnName: nameof(MeasurementInput.Temperature),
-                windowSize: Math.Min(7, data.Count / 2),
-                seriesLength: Math.Min(10, data.Count),
+                windowSize: 3,
+                seriesLength: 10,
                 trainSize: data.Count,
                 horizon: horizon,
                 confidenceLevel: 0.95f,
@@ -55,18 +55,15 @@ namespace WeatherISML.Services
             );
 
             var model = pipeline.Fit(dataView);
-
             SaveModel(model);
 
             var forecastEngine = model.CreateTimeSeriesEngine<MeasurementInput, PredictionOutput>(_mlContext);
             return forecastEngine.Predict();
         }
 
-        public ModelEvaluation EvaluateModel(IEnumerable<Measurement> measurements)
+        public ModelEvaluation EvaluateModel(IEnumerable<WeatherDataDto> weatherData)
         {
-            var data = measurements
-                .OrderBy(m => m.Timestamp)
-                .ToList();
+            var data = weatherData.OrderBy(m => m.Timestamp).ToList();
 
             if (data.Count < 20)
                 return new ModelEvaluation { IsValid = false };
@@ -101,7 +98,7 @@ namespace WeatherISML.Services
             for (int i = 0; i < count; i++)
                 ssRes += Math.Pow(actual[i] - predicted[i], 2);
 
-            double r2 = 1 - (ssRes / ssTot);
+            double r2 = ssTot == 0 ? 0 : 1 - (ssRes / ssTot);
 
             return new ModelEvaluation
             {

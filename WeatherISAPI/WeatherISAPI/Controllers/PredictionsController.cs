@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using WeatherISCore.Entities;
 using WeatherISCore.Interfaces;
+using WeatherISAPI.Services;
 using WeatherISML.Services;
 
 namespace WeatherISAPI.Controllers
@@ -9,30 +10,41 @@ namespace WeatherISAPI.Controllers
     [Route("api/[controller]")]
     public class PredictionsController : ControllerBase
     {
-        private readonly IMeasurementRepository _measurementRepository;
+        private readonly ISensorRepository _sensorRepository;
         private readonly IPredictionRepository _predictionRepository;
         private readonly WeatherPredictionService _predictionService;
+        private readonly OpenMeteoService _openMeteoService;
 
         public PredictionsController(
-            IMeasurementRepository measurementRepository,
+            ISensorRepository sensorRepository,
             IPredictionRepository predictionRepository,
-            WeatherPredictionService predictionService)
+            WeatherPredictionService predictionService,
+            OpenMeteoService openMeteoService)
         {
-            _measurementRepository = measurementRepository;
+            _sensorRepository = sensorRepository;
             _predictionRepository = predictionRepository;
             _predictionService = predictionService;
+            _openMeteoService = openMeteoService;
         }
 
         [HttpPost("sensor/{sensorId}")]
-        public async Task<IActionResult> GeneratePrediction(int sensorId, [FromQuery] int horizon = 24)
+        public async Task<IActionResult> GeneratePrediction(
+            int sensorId, [FromQuery] int horizon = 384)
         {
-            var measurements = await _measurementRepository.GetBySensorIdAsync(sensorId);
-            var measurementList = measurements.ToList();
+            var sensor = await _sensorRepository.GetByIdAsync(sensorId);
+            if (sensor == null) return NotFound();
 
-            if (measurementList.Count < 12)
-                return BadRequest($"Nedovoljno podataka. Ima: {measurementList.Count}, treba: 12");
+            // Dohvati 90 dana historical podataka za treniranje
+            var endDate = DateTime.UtcNow.Date.AddDays(-1);
+            var startDate = endDate.AddDays(-90);
 
-            var result = _predictionService.PredictTemperature(measurementList, horizon);
+            var historicalData = await _openMeteoService.GetHistoricalDataAsync(
+                sensorId, sensor.Latitude, sensor.Longitude, startDate, endDate);
+
+            if (historicalData.Count < 12)
+                return BadRequest("Nedovoljno podataka za treniranje modela.");
+
+            var result = _predictionService.PredictTemperature(historicalData, horizon);
 
             if (result.ForecastedTemperature.Length == 0)
                 return BadRequest("Model nije mogao generirati predviđanje.");
@@ -40,7 +52,7 @@ namespace WeatherISAPI.Controllers
             var predictions = new List<Prediction>();
             for (int i = 0; i < result.ForecastedTemperature.Length; i++)
             {
-                var prediction = new Prediction
+                predictions.Add(new Prediction
                 {
                     SensorId = sensorId,
                     GeneratedAt = DateTime.UtcNow,
@@ -48,17 +60,19 @@ namespace WeatherISAPI.Controllers
                     PredictedTemperature = Math.Round(result.ForecastedTemperature[i], 2),
                     PredictedHumidity = 0,
                     PredictedPressure = 0,
-                    ModelVersion = "SSA-v1"
-                };
-                predictions.Add(prediction);
-                await _predictionRepository.AddAsync(prediction);
+                    ModelVersion = "SSA-v1",
+                    Source = "MLModel"
+                });
             }
+
+            await _predictionRepository.AddRangeAsync(predictions);
 
             return Ok(new
             {
                 SensorId = sensorId,
                 GeneratedAt = DateTime.UtcNow,
                 Horizon = horizon,
+                TrainSize = historicalData.Count,
                 Predictions = predictions
             });
         }
@@ -66,8 +80,16 @@ namespace WeatherISAPI.Controllers
         [HttpGet("sensor/{sensorId}/evaluate")]
         public async Task<IActionResult> EvaluateModel(int sensorId)
         {
-            var measurements = await _measurementRepository.GetBySensorIdAsync(sensorId);
-            var evaluation = _predictionService.EvaluateModel(measurements);
+            var sensor = await _sensorRepository.GetByIdAsync(sensorId);
+            if (sensor == null) return NotFound();
+
+            var endDate = DateTime.UtcNow.Date.AddDays(-1);
+            var startDate = endDate.AddDays(-90);
+
+            var historicalData = await _openMeteoService.GetHistoricalDataAsync(
+                sensorId, sensor.Latitude, sensor.Longitude, startDate, endDate);
+
+            var evaluation = _predictionService.EvaluateModel(historicalData);
 
             if (!evaluation.IsValid)
                 return BadRequest("Nedovoljno podataka za evaluaciju modela.");
@@ -80,6 +102,40 @@ namespace WeatherISAPI.Controllers
         {
             var predictions = await _predictionRepository.GetBySensorIdAsync(sensorId);
             return Ok(predictions);
+        }
+
+        [HttpGet("compare/{sensorId}")]
+        public async Task<IActionResult> GetComparison(int sensorId)
+        {
+            var allPredictions = await _predictionRepository.GetBySensorIdAsync(sensorId);
+            var now = DateTime.UtcNow;
+            var toDate = now.AddDays(16);
+
+            var mlPredictions = allPredictions
+                .Where(p => p.Source == "MLModel" && p.PredictedFor >= now && p.PredictedFor <= toDate)
+                .GroupBy(p => p.PredictedFor.Date)
+                .Select(g => new
+                {
+                    time = g.Key,
+                    temperature = Math.Round(g.Average(p => p.PredictedTemperature), 2)
+                })
+                .OrderBy(x => x.time);
+
+            var openMeteoPredictions = allPredictions
+                .Where(p => p.Source == "OpenMeteo" && p.PredictedFor >= now && p.PredictedFor <= toDate)
+                .GroupBy(p => p.PredictedFor.Date)
+                .Select(g => new
+                {
+                    time = g.Key,
+                    temperature = Math.Round(g.Average(p => p.PredictedTemperature), 2)
+                })
+                .OrderBy(x => x.time);
+
+            return Ok(new
+            {
+                MLModel = mlPredictions,
+                OpenMeteo = openMeteoPredictions
+            });
         }
     }
 }

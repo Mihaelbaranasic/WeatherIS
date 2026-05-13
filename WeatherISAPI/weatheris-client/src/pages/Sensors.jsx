@@ -23,24 +23,23 @@ function Sensors() {
     fetchSensors()
   }, [])
 
-  const handleSubmit = async () => {
-    try {
-      await sensorService.create({
-        ...form,
-        id: 0,
-        latitude: parseFloat(form.latitude),
-        longitude: parseFloat(form.longitude),
-        createdAt: new Date().toISOString(),
-        measurements: []
-      })
-      const res = await sensorService.getAll()
-      setSensors(res.data)
-      setShowForm(false)
-      setForm({ name: '', location: '', latitude: '', longitude: '', isActive: true })
-    } catch (err) {
-      console.error('Greška pri kreiranju:', err)
+    const handleSubmit = async () => {
+        try {
+            await sensorService.create({
+                ...form,
+                id: 0,
+                latitude: parseFloat(form.latitude),
+                longitude: parseFloat(form.longitude),
+                createdAt: new Date().toISOString()
+            })
+            const res = await sensorService.getAll()
+            setSensors(res.data)
+            setShowForm(false)
+            setForm({ name: '', location: '', latitude: '', longitude: '', isActive: true })
+        } catch (err) {
+            console.error('Greška pri kreiranju:', err)
+        }
     }
-  }
 
   const handleToggle = async (id) => {
     try {

@@ -8,7 +8,13 @@ using WeatherISML.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler =
+            System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    });
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -18,25 +24,17 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // Repozitoriji
 builder.Services.AddScoped<ISensorRepository, SensorRepository>();
-builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
 builder.Services.AddScoped<IPredictionRepository, PredictionRepository>();
 builder.Services.AddScoped<IAlertRepository, AlertRepository>();
-// ML servis
-builder.Services.AddSingleton<WeatherPredictionService>();
 
-// CORS za React
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("ReactPolicy", policy =>
-    {
-        policy.WithOrigins("http://localhost:5173")
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
-    });
-});
-builder.Services.AddSignalR();
+// Servisi
+builder.Services.AddSingleton<WeatherPredictionService>();
+builder.Services.AddHttpClient<OpenMeteoService>();
+builder.Services.AddHostedService<DataSyncService>();
 builder.Services.AddHostedService<IoTSimulatorService>();
+builder.Services.AddSignalR();
+
+// CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("ReactPolicy", policy =>
@@ -51,6 +49,7 @@ builder.Services.AddCors(options =>
               .AllowCredentials();
     });
 });
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())

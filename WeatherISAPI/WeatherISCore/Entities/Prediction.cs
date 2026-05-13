@@ -1,5 +1,5 @@
 ﻿using WeatherISCore.Entities;
-
+namespace WeatherISCore.Entities;
 public class Prediction
 {
     public int Id { get; set; }

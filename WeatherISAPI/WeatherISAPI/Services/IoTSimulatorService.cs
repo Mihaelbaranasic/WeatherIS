@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.DependencyInjection;
-using WeatherISCore.Entities;
+using WeatherISCore.DTOs;
 using WeatherISCore.Interfaces;
 using WeatherISAPI.Hubs;
 
@@ -12,7 +11,6 @@ namespace WeatherISAPI.Services
         private readonly IHubContext<SensorHub> _hubContext;
         private readonly ILogger<IoTSimulatorService> _logger;
         private readonly Random _random = new();
-
         private readonly Dictionary<int, SensorBaseline> _baselines = new();
 
         public IoTSimulatorService(
@@ -40,34 +38,28 @@ namespace WeatherISAPI.Services
         {
             using var scope = _serviceProvider.CreateScope();
             var sensorRepo = scope.ServiceProvider.GetRequiredService<ISensorRepository>();
-            var measurementRepo = scope.ServiceProvider.GetRequiredService<IMeasurementRepository>();
-            var alertRepo = scope.ServiceProvider.GetRequiredService<IAlertRepository>();
-
             var sensors = await sensorRepo.GetActiveSensorsAsync();
 
             foreach (var sensor in sensors)
             {
                 var baseline = GetOrCreateBaseline(sensor.Id);
-                var measurement = GenerateMeasurement(sensor.Id, baseline);
-
-                await measurementRepo.AddAsync(measurement);
-                await CheckAndCreateAlerts(sensor, measurement, alertRepo);
+                var data = GenerateWeatherData(sensor.Id, baseline);
 
                 await _hubContext.Clients
                     .Group($"sensor-{sensor.Id}")
-                    .SendAsync("ReceiveMeasurement", measurement);
+                    .SendAsync("ReceiveMeasurement", data);
 
                 await _hubContext.Clients
                     .All
-                    .SendAsync("ReceiveLatestMeasurement", measurement);
+                    .SendAsync("ReceiveLatestMeasurement", data);
 
                 _logger.LogInformation(
-                    "Senzor {SensorId}: temp={Temp}°C, vlažnost={Humidity}%",
-                    sensor.Id, measurement.Temperature, measurement.Humidity);
+                    "Senzor {SensorId}: temp={Temp}°C",
+                    sensor.Id, data.Temperature);
             }
         }
 
-        private Measurement GenerateMeasurement(int sensorId, SensorBaseline baseline)
+        private WeatherDataDto GenerateWeatherData(int sensorId, SensorBaseline baseline)
         {
             var hour = DateTime.Now.Hour;
             var dailyTempCycle = Math.Sin((hour - 6) * Math.PI / 12) * 5;
@@ -82,7 +74,7 @@ namespace WeatherISAPI.Services
             baseline.Pressure = Math.Clamp(baseline.Pressure, 960, 1050);
             baseline.WindSpeed = Math.Clamp(baseline.WindSpeed, 0, 120);
 
-            return new Measurement
+            return new WeatherDataDto
             {
                 SensorId = sensorId,
                 Timestamp = DateTime.UtcNow,
@@ -91,44 +83,9 @@ namespace WeatherISAPI.Services
                 Pressure = Math.Round(baseline.Pressure, 2),
                 WindSpeed = Math.Round(baseline.WindSpeed, 2),
                 WindDirection = Math.Round(_random.NextDouble() * 360, 2),
-                Precipitation = _random.NextDouble() < 0.2
-                    ? Math.Round(_random.NextDouble() * 5, 2)
-                    : 0
+                Precipitation = _random.NextDouble() < 0.2 ? Math.Round(_random.NextDouble() * 5, 2) : 0,
+                Source = "Simulator"
             };
-        }
-
-        private async Task CheckAndCreateAlerts(
-            Sensor sensor,
-            Measurement measurement,
-            IAlertRepository alertRepo)
-        {
-            var alerts = new List<(string param, double threshold, double value)>
-            {
-                ("Temperature", 35.0, measurement.Temperature),
-                ("Temperature", -10.0, measurement.Temperature),
-                ("WindSpeed", 80.0, measurement.WindSpeed),
-                ("Humidity", 95.0, measurement.Humidity)
-            };
-
-            foreach (var (param, threshold, value) in alerts)
-            {
-                bool triggered = param == "Temperature" && threshold < 0
-                    ? value < threshold
-                    : value > threshold;
-
-                if (triggered)
-                {
-                    await alertRepo.AddAsync(new Alert
-                    {
-                        SensorId = sensor.Id,
-                        Parameter = param,
-                        ThresholdValue = threshold,
-                        MeasuredValue = value,
-                        TriggeredAt = DateTime.UtcNow,
-                        IsResolved = false
-                    });
-                }
-            }
         }
 
         private SensorBaseline GetOrCreateBaseline(int sensorId)
