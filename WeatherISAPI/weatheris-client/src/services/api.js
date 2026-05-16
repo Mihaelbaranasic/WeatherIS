@@ -20,7 +20,8 @@ export const sensorService = {
 export const weatherService = {
     getCurrentAll: () => api.get('/weather/current'),
     getCurrent: (sensorId) => api.get(`/weather/current/${sensorId}`),
-    getHistory: (sensorId, days = 30) => api.get(`/weather/history/${sensorId}`, { params: { days } })
+    getHistory: (sensorId, days = 30) => api.get(`/weather/history/${sensorId}`, { params: { days } }),
+    getStatistics: (sensorId, days = 90) => api.get(`/weather/statistics/${sensorId}`, { params: { days } })
 }
 
 export const predictionService = {
@@ -28,7 +29,7 @@ export const predictionService = {
         api.post(`/predictions/sensor/${sensorId}`, null, { params: { horizon } }),
     getBySensor: (sensorId) => api.get(`/predictions/sensor/${sensorId}`),
     evaluate: (sensorId) => api.get(`/predictions/sensor/${sensorId}/evaluate`),
-    getComparison: (sensorId) => api.get(`/predictions/compare/${sensorId}`)
+    getComparison: (sensorId, horizon = 384) => api.get(`/predictions/compare/${sensorId}`, { params: { horizon } })
 }
 
 export const alertService = {

@@ -101,6 +101,10 @@ namespace WeatherISAPI.Services
                 .Where(a => a.IsResolved && a.TriggeredAt < cutoffDate);
             context.Alerts.RemoveRange(oldAlerts);
 
+            var veryOldAlerts = context.Alerts
+                .Where(a => a.TriggeredAt < DateTime.UtcNow.AddDays(-7));
+            context.Alerts.RemoveRange(veryOldAlerts);
+
             await context.SaveChangesAsync();
             _logger.LogInformation("Čišćenje završeno.");
         }

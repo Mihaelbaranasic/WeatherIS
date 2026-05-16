@@ -152,5 +152,56 @@ namespace WeatherISAPI.Services
                 return new List<Prediction>();
             }
         }
+        public async Task<List<WeatherDataDto>> GetForecastFeaturesAsync(
+    int sensorId, double latitude, double longitude, int days = 16)
+        {
+            var url = $"https://api.open-meteo.com/v1/forecast" +
+                      $"?latitude={latitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
+                      $"&longitude={longitude.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
+                      $"&hourly=temperature_2m,relative_humidity_2m,pressure_msl,wind_speed_10m,cloud_cover,precipitation_probability" +
+                      $"&forecast_days={days}" +
+                      $"&timezone=Europe%2FBerlin";
+
+            try
+            {
+                var response = await _httpClient.GetStringAsync(url);
+                var json = JsonDocument.Parse(response);
+                var hourly = json.RootElement.GetProperty("hourly");
+
+                var times = hourly.GetProperty("time").EnumerateArray().ToList();
+                var temps = hourly.GetProperty("temperature_2m").EnumerateArray().ToList();
+                var humidity = hourly.GetProperty("relative_humidity_2m").EnumerateArray().ToList();
+                var pressure = hourly.GetProperty("pressure_msl").EnumerateArray().ToList();
+                var windSpeed = hourly.GetProperty("wind_speed_10m").EnumerateArray().ToList();
+                var cloudCover = hourly.GetProperty("cloud_cover").EnumerateArray().ToList();
+                var precipProb = hourly.GetProperty("precipitation_probability").EnumerateArray().ToList();
+
+                var result = new List<WeatherDataDto>();
+                for (int i = 0; i < times.Count; i++)
+                {
+                    if (DateTime.TryParse(times[i].GetString(), out var timestamp))
+                    {
+                        result.Add(new WeatherDataDto
+                        {
+                            SensorId = sensorId,
+                            Timestamp = DateTime.SpecifyKind(timestamp, DateTimeKind.Utc),
+                            Temperature = temps[i].ValueKind != JsonValueKind.Null ? temps[i].GetDouble() : 0,
+                            Humidity = humidity[i].ValueKind != JsonValueKind.Null ? humidity[i].GetDouble() : 0,
+                            Pressure = pressure[i].ValueKind != JsonValueKind.Null ? pressure[i].GetDouble() : 0,
+                            WindSpeed = windSpeed[i].ValueKind != JsonValueKind.Null ? windSpeed[i].GetDouble() : 0,
+                            CloudCover = cloudCover[i].ValueKind != JsonValueKind.Null ? cloudCover[i].GetDouble() : 0,
+                            PrecipitationProbability = precipProb[i].ValueKind != JsonValueKind.Null ? precipProb[i].GetDouble() : 0,
+                            Source = "OpenMeteo-Features"
+                        });
+                    }
+                }
+
+                return result;
+            } catch (Exception ex)
+            {
+                _logger.LogError(ex, "Greška pri dohvatu forecast features");
+                return new List<WeatherDataDto>();
+            }
+        }
     }
 }
