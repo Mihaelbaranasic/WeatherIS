@@ -209,7 +209,7 @@ function Predictions() {
 
             {!loadingComparison && !comparisonData && (
                 <div className="flex flex-col items-center justify-center py-20">
-                    <div className="text-5xl mb-4">🔮</div>
+                    <i className="fa-solid fa-brain" style={{ fontSize: '48px', color: 'var(--text-secondary)', marginBottom: '16px' }} />
                     <p className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
                         Nema predikcija
                     </p>

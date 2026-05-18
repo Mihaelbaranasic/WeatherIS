@@ -37,3 +37,10 @@ export const alertService = {
     getBySensor: (sensorId) => api.get(`/alerts/sensor/${sensorId}`),
     resolve: (id) => api.patch(`/alerts/${id}/resolve`)
 }
+
+export const subscriptionService = {
+    subscribe: (email, sensorId = null) => api.post('/subscription/subscribe', { email, sensorId }),
+    unsubscribe: (email, sensorId = null) => api.post('/subscription/unsubscribe', { email, sensorId }),
+    getStatus: (email, sensorId = null) => api.get('/subscription/status', { params: { email, sensorId } }),
+    getList: (email) => api.get(`/subscription/list/${email}`)
+}

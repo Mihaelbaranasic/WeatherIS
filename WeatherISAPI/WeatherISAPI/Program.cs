@@ -26,6 +26,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<ISensorRepository, SensorRepository>();
 builder.Services.AddScoped<IPredictionRepository, PredictionRepository>();
 builder.Services.AddScoped<IAlertRepository, AlertRepository>();
+builder.Services.AddScoped<IEmailSubscriptionRepository, EmailSubscriptionRepository>();
+builder.Services.AddScoped<EmailService>();
 
 // Servisi
 builder.Services.AddSingleton<WeatherPredictionService>();

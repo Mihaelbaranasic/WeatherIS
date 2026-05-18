@@ -1,7 +1,7 @@
-﻿using WeatherISCore.DTOs;
-using WeatherISCore.Entities;
+﻿using WeatherISCore.Entities;
 using WeatherISCore.Interfaces;
 using WeatherISDB;
+using WeatherISAPI.Services;
 
 namespace WeatherISAPI.Services
 {
@@ -24,6 +24,7 @@ namespace WeatherISAPI.Services
             {
                 await Task.Delay(5000, stoppingToken);
                 await SyncForecastsAsync();
+                await CheckAlertsAsync();
             }, stoppingToken);
 
             while (!stoppingToken.IsCancellationRequested)
@@ -37,6 +38,7 @@ namespace WeatherISAPI.Services
 
                 await CleanOldDataAsync();
                 await SyncForecastsAsync();
+                await CheckAlertsAsync();
             }
         }
 
@@ -49,7 +51,7 @@ namespace WeatherISAPI.Services
             var predictionRepo = scope.ServiceProvider.GetRequiredService<IPredictionRepository>();
             var openMeteoService = scope.ServiceProvider.GetRequiredService<OpenMeteoService>();
 
-            var sensors = await sensorRepo.GetActiveSensorsAsync();
+            var sensors = (await sensorRepo.GetActiveSensorsAsync()).ToList();
 
             foreach (var sensor in sensors)
             {
@@ -85,6 +87,88 @@ namespace WeatherISAPI.Services
             _logger.LogInformation("Sync forecasta završen.");
         }
 
+        private async Task CheckAlertsAsync()
+        {
+            _logger.LogInformation("Provjera alarma...");
+
+            using var scope = _serviceProvider.CreateScope();
+            var sensorRepo = scope.ServiceProvider.GetRequiredService<ISensorRepository>();
+            var alertRepo = scope.ServiceProvider.GetRequiredService<IAlertRepository>();
+            var subscriptionRepo = scope.ServiceProvider.GetRequiredService<IEmailSubscriptionRepository>();
+            var openMeteoService = scope.ServiceProvider.GetRequiredService<OpenMeteoService>();
+            var emailService = scope.ServiceProvider.GetRequiredService<EmailService>();
+
+            var sensors = (await sensorRepo.GetActiveSensorsAsync()).ToList();
+            var weatherData = await openMeteoService.GetCurrentAllAsync(sensors);
+
+            var thresholds = new List<(string param, double threshold, bool isUpperBound)>
+            {
+                ("Temperature", 30.0, true),
+                ("Temperature", 0.0, false),
+                ("WindSpeed", 50.0, true),
+                ("Precipitation", 5.0, true),
+                ("Pressure", 990.0, false),
+                ("Humidity", 90.0, true),
+            };
+
+            foreach (var sensor in sensors)
+            {
+                var current = weatherData.FirstOrDefault(w => w.SensorId == sensor.Id);
+                if (current == null) continue;
+
+                foreach (var (param, threshold, isUpperBound) in thresholds)
+                {
+                    double value = param switch
+                    {
+                        "Temperature" => current.Temperature,
+                        "WindSpeed" => current.WindSpeed,
+                        "Precipitation" => current.Precipitation,
+                        "Pressure" => current.Pressure,
+                        "Humidity" => current.Humidity,
+                        _ => 0
+                    };
+
+                    bool isTriggered = isUpperBound ? value > threshold : value < threshold;
+
+                    if (isTriggered)
+                    {
+                        var existing = await alertRepo.GetActiveAlertAsync(sensor.Id, param);
+                        if (existing == null)
+                        {
+                            await alertRepo.AddAsync(new Alert
+                            {
+                                SensorId = sensor.Id,
+                                Parameter = param,
+                                ThresholdValue = threshold,
+                                MeasuredValue = value,
+                                TriggeredAt = DateTime.UtcNow,
+                                IsResolved = false
+                            });
+
+                            var subscribers = await subscriptionRepo.GetActiveBySensorIdAsync(sensor.Id);
+                            if (subscribers.Any())
+                            {
+                                await emailService.SendAlertToSubscribersAsync(
+                                    subscribers.Select(s => s.Email),
+                                    sensor.Name,
+                                    param,
+                                    value,
+                                    threshold);
+                            }
+
+                            _logger.LogInformation(
+                                "Alert okidan: Senzor {Id}, param {Param}, vrijednost {Value}",
+                                sensor.Id, param, value);
+                        }
+                    }
+                }
+
+                await Task.Delay(300);
+            }
+
+            _logger.LogInformation("Provjera alarma završena.");
+        }
+
         private async Task CleanOldDataAsync()
         {
             _logger.LogInformation("Čišćenje starih podataka...");
@@ -108,53 +192,6 @@ namespace WeatherISAPI.Services
 
             await context.SaveChangesAsync();
             _logger.LogInformation("Čišćenje završeno.");
-        }
-        private async Task CheckAlertsAsync(List<WeatherDataDto> measurements, Sensor sensor, IAlertRepository alertRepo)
-        {
-            var thresholds = new List<(string param, double threshold, bool isUpperBound, string description)>
-    {
-        ("Temperature", 30.0, true, "Visoka temperatura"),
-        ("Temperature", 0.0, false, "Niska temperatura"),
-        ("WindSpeed", 50.0, true, "Jak vjetar"),
-        ("Precipitation", 5.0, true, "Intenzivne oborine"),
-        ("Pressure", 990.0, false, "Nizak tlak - moguća oluja"),
-        ("Humidity", 90.0, true, "Visoka vlažnost"),
-    };
-
-            foreach (var measurement in measurements)
-            {
-                foreach (var (param, threshold, isUpperBound, description) in thresholds)
-                {
-                    double value = param switch
-                    {
-                        "Temperature" => measurement.Temperature,
-                        "WindSpeed" => measurement.WindSpeed,
-                        "Precipitation" => measurement.Precipitation,
-                        "Pressure" => measurement.Pressure,
-                        "Humidity" => measurement.Humidity,
-                        _ => 0
-                    };
-
-                    bool triggered = isUpperBound ? value > threshold : value < threshold;
-
-                    if (triggered)
-                    {
-                        var existing = await alertRepo.GetActiveAlertAsync(sensor.Id, param);
-                        if (existing == null)
-                        {
-                            await alertRepo.AddAsync(new Alert
-                            {
-                                SensorId = sensor.Id,
-                                Parameter = param,
-                                ThresholdValue = threshold,
-                                MeasuredValue = value,
-                                TriggeredAt = measurement.Timestamp,
-                                IsResolved = false
-                            });
-                        }
-                    }
-                }
-            }
         }
     }
 }

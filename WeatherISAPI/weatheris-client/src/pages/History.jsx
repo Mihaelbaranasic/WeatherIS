@@ -142,7 +142,7 @@ function History() {
 
             {!loading && data.length === 0 && (
                 <div className="flex flex-col items-center justify-center py-20">
-                    <div className="text-5xl mb-4">📈</div>
+                    <i className="fa-solid fa-chart-line" style={{ fontSize: '48px', color: 'var(--text-secondary)', marginBottom: '16px' }} />
                     <p className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
                         Odaberi senzor i period
                     </p>

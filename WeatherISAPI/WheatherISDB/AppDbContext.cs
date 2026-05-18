@@ -11,7 +11,7 @@ namespace WeatherISDB
         public DbSet<Sensor> Sensors { get; set; }
         public DbSet<Prediction> Predictions { get; set; }
         public DbSet<Alert> Alerts { get; set; }
-
+        public DbSet<EmailSubscription> EmailSubscriptions { get; set; }
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);

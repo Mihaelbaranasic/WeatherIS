@@ -3,12 +3,12 @@ import { weatherService } from '../services/api'
 import * as signalR from '@microsoft/signalr'
 
 function getWeatherIcon(temp) {
-    if (temp === null || temp === undefined) return '🌡️'
-    if (temp > 30) return '☀️'
-    if (temp > 20) return '🌤️'
-    if (temp > 10) return '⛅'
-    if (temp > 0) return '🌥️'
-    return '❄️'
+    if (temp === null || temp === undefined) return 'fa-solid fa-thermometer'
+    if (temp > 30) return 'fa-solid fa-sun'
+    if (temp > 20) return 'fa-solid fa-cloud-sun'
+    if (temp > 10) return 'fa-solid fa-cloud'
+    if (temp > 0) return 'fa-solid fa-cloud-drizzle'
+    return 'fa-solid fa-snowflake'
 }
 
 function Dashboard() {
@@ -64,7 +64,7 @@ function Dashboard() {
     if (loading) return (
         <div className="flex items-center justify-center h-full">
             <div className="text-center">
-                <div className="text-4xl mb-4">⚡</div>
+                <i className="fa-solid fa-bolt" style={{ fontSize: '40px', color: 'var(--accent-blue)', marginBottom: '16px' }} />
                 <p style={{ color: 'var(--text-secondary)' }}>Dohvaćanje podataka s OpenMeteo...</p>
             </div>
         </div>
@@ -122,7 +122,8 @@ function Dashboard() {
                             </div>
 
                             <div className="flex items-center gap-2 mb-3">
-                                <span className="text-3xl">{getWeatherIcon(item.weather?.temperature)}</span>
+                                <i className={getWeatherIcon(item.weather?.temperature)}
+                                    style={{ fontSize: '28px', color: 'var(--accent-blue)', width: '36px', textAlign: 'center' }} />
                                 <span className="text-3xl font-bold" style={{ color: 'var(--accent-blue)' }}>
                                     {item.weather?.temperature}°C
                                 </span>

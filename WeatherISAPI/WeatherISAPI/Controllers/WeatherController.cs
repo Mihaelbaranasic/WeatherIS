@@ -11,13 +11,19 @@ namespace WeatherISAPI.Controllers
     {
         private readonly ISensorRepository _sensorRepository;
         private readonly OpenMeteoService _openMeteoService;
+        private readonly IEmailSubscriptionRepository _subscriptionRepository;
+        private readonly EmailService _emailService;
 
         public WeatherController(
             ISensorRepository sensorRepository,
-            OpenMeteoService openMeteoService)
+            OpenMeteoService openMeteoService,
+            EmailService emailService,
+            IEmailSubscriptionRepository subscriptionRepository)
         {
             _sensorRepository = sensorRepository;
             _openMeteoService = openMeteoService;
+            _emailService = emailService;
+            _subscriptionRepository = subscriptionRepository;
         }
 
         [HttpGet("current/{sensorId}")]
@@ -197,8 +203,7 @@ namespace WeatherISAPI.Controllers
 
             var thresholds = new List<(string param, double threshold, bool isUpperBound)>
     {
-        ("Temperature", 15.0, true),
-        ("Temperature", 5.0, false),
+        ("Temperature", 25.0, true),
         ("WindSpeed", 10.0, true),
         ("Precipitation", 0.1, true),
         ("Pressure", 1015.0, false),
@@ -238,6 +243,17 @@ namespace WeatherISAPI.Controllers
                                 TriggeredAt = DateTime.UtcNow,
                                 IsResolved = false
                             });
+                            var subscribers = await _subscriptionRepository.GetActiveBySensorIdAsync(sensor.Id);
+                            if (subscribers.Any())
+                            {
+                                await _emailService.SendAlertToSubscribersAsync(
+                                    subscribers.Select(s => s.Email),
+                                    sensor.Name,
+                                    param,
+                                    value,
+                                    threshold
+                                );
+                            }
                             triggered++;
                         }
                     }
