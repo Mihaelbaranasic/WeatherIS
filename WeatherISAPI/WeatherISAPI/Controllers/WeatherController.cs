@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using WeatherISCore.Interfaces;
 using WeatherISAPI.Services;
+using WeatherISCore.Entities;
+using WeatherISCore.Interfaces;
 
 namespace WeatherISAPI.Controllers
 {
@@ -17,36 +18,6 @@ namespace WeatherISAPI.Controllers
         {
             _sensorRepository = sensorRepository;
             _openMeteoService = openMeteoService;
-        }
-
-        [HttpGet("current")]
-        public async Task<IActionResult> GetCurrentAll()
-        {
-            var sensors = await _sensorRepository.GetActiveSensorsAsync();
-            var results = new List<object>();
-
-            foreach (var sensor in sensors)
-            {
-                var data = await _openMeteoService.GetCurrentAsync(
-                    sensor.Id, sensor.Latitude, sensor.Longitude);
-
-                if (data != null)
-                {
-                    results.Add(new
-                    {
-                        sensorId = sensor.Id,
-                        sensorName = sensor.Name,
-                        location = sensor.Location,
-                        latitude = sensor.Latitude,
-                        longitude = sensor.Longitude,
-                        weather = data
-                    });
-                }
-
-                await Task.Delay(200);
-            }
-
-            return Ok(results);
         }
 
         [HttpGet("current/{sensorId}")]
@@ -112,11 +83,11 @@ namespace WeatherISAPI.Controllers
             // Deskriptivne statistike
             var stats = new
             {
-                Temperature = GetStats(temps, "Temperatura (°C)"),
-                Humidity = GetStats(humidity, "Vlažnost (%)"),
-                Pressure = GetStats(pressure, "Tlak (hPa)"),
-                WindSpeed = GetStats(windSpeed, "Brzina vjetra (km/h)"),
-                Precipitation = GetStats(precipitation, "Oborine (mm)")
+                temperature = GetStats(temps, "Temperatura (°C)"),
+                humidity = GetStats(humidity, "Vlažnost (%)"),
+                pressure = GetStats(pressure, "Tlak (hPa)"),
+                windSpeed = GetStats(windSpeed, "Brzina vjetra (km/h)"),
+                precipitation = GetStats(precipitation, "Oborine (mm)")
             };
 
             // Korelacije
@@ -182,16 +153,99 @@ namespace WeatherISAPI.Controllers
             int n = sorted.Count;
             return new
             {
-                Name = name,
-                Count = n,
-                Mean = Math.Round(values.Average(), 2),
-                Median = Math.Round(sorted[n / 2], 2),
-                Std = Math.Round(Math.Sqrt(values.Average(v => Math.Pow(v - values.Average(), 2))), 2),
-                Min = Math.Round(sorted.First(), 2),
-                Max = Math.Round(sorted.Last(), 2),
-                Q1 = Math.Round(sorted[n / 4], 2),
-                Q3 = Math.Round(sorted[3 * n / 4], 2)
+                name,
+                count = n,
+                mean = Math.Round(values.Average(), 2),
+                median = Math.Round(sorted[n / 2], 2),
+                std = Math.Round(Math.Sqrt(values.Average(v => Math.Pow(v - values.Average(), 2))), 2),
+                min = Math.Round(sorted.First(), 2),
+                max = Math.Round(sorted.Last(), 2),
+                q1 = Math.Round(sorted[n / 4], 2),
+                q3 = Math.Round(sorted[3 * n / 4], 2)
             };
+        }
+        [HttpGet("current")]
+        public async Task<IActionResult> GetCurrentAll()
+        {
+            var sensors = (await _sensorRepository.GetActiveSensorsAsync()).ToList();
+            var weatherData = await _openMeteoService.GetCurrentAllAsync(sensors);
+
+            var results = sensors.Select(sensor =>
+            {
+                var data = weatherData.FirstOrDefault(w => w.SensorId == sensor.Id);
+                return new
+                {
+                    sensorId = sensor.Id,
+                    sensorName = sensor.Name,
+                    location = sensor.Location,
+                    latitude = sensor.Latitude,
+                    longitude = sensor.Longitude,
+                    weather = data
+                };
+            }).Where(r => r.weather != null).ToList();
+
+            return Ok(results);
+        }
+
+        [HttpPost("check-alerts")]
+        public async Task<IActionResult> CheckAlerts()
+        {
+            var sensors = (await _sensorRepository.GetActiveSensorsAsync()).ToList();
+            var alertRepo = HttpContext.RequestServices.GetRequiredService<IAlertRepository>();
+            var weatherData = await _openMeteoService.GetCurrentAllAsync(sensors);
+            int triggered = 0;
+
+            var thresholds = new List<(string param, double threshold, bool isUpperBound)>
+    {
+        ("Temperature", 15.0, true),
+        ("Temperature", 5.0, false),
+        ("WindSpeed", 10.0, true),
+        ("Precipitation", 0.1, true),
+        ("Pressure", 1015.0, false),
+        ("Humidity", 50.0, true),
+    };
+
+            foreach (var sensor in sensors)
+            {
+                var current = weatherData.FirstOrDefault(w => w.SensorId == sensor.Id);
+                if (current == null) continue;
+
+                foreach (var (param, threshold, isUpperBound) in thresholds)
+                {
+                    double value = param switch
+                    {
+                        "Temperature" => current.Temperature,
+                        "WindSpeed" => current.WindSpeed,
+                        "Precipitation" => current.Precipitation,
+                        "Pressure" => current.Pressure,
+                        "Humidity" => current.Humidity,
+                        _ => 0
+                    };
+
+                    bool isTriggered = isUpperBound ? value > threshold : value < threshold;
+
+                    if (isTriggered)
+                    {
+                        var existing = await alertRepo.GetActiveAlertAsync(sensor.Id, param);
+                        if (existing == null)
+                        {
+                            await alertRepo.AddAsync(new Alert
+                            {
+                                SensorId = sensor.Id,
+                                Parameter = param,
+                                ThresholdValue = threshold,
+                                MeasuredValue = value,
+                                TriggeredAt = DateTime.UtcNow,
+                                IsResolved = false
+                            });
+                            triggered++;
+                        }
+                    }
+                }
+            }
+
+            int sensorCount = sensors.Count;
+            return Ok(new { Triggered = triggered, Sensors = sensorCount });
         }
 
         private static double Correlation(List<double> x, List<double> y)

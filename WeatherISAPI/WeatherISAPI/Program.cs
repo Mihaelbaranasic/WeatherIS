@@ -32,6 +32,7 @@ builder.Services.AddSingleton<WeatherPredictionService>();
 builder.Services.AddHttpClient<OpenMeteoService>();
 builder.Services.AddHostedService<DataSyncService>();
 builder.Services.AddHostedService<IoTSimulatorService>();
+builder.Services.AddHostedService<WeatherBroadcastService>();
 builder.Services.AddSignalR();
 
 // CORS
@@ -40,10 +41,11 @@ builder.Services.AddCors(options =>
     options.AddPolicy("ReactPolicy", policy =>
     {
         policy.WithOrigins(
-                "http://localhost:5173",
-                "http://localhost:52257",
-                "https://localhost:52257"
-              )
+            "http://127.0.0.1:52257",
+            "https://127.0.0.1:52257",
+            "http://localhost:5173",
+            "http://localhost:5174"
+        )
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -63,5 +65,6 @@ app.UseCors("ReactPolicy");
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<SensorHub>("/hubs/sensor");
+app.MapHub<WeatherHub>("/hubs/weather");
 
 app.Run();

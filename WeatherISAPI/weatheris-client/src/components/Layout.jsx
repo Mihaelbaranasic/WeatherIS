@@ -1,13 +1,13 @@
 import { Outlet, NavLink } from 'react-router-dom'
 
 const navItems = [
-    { to: '/', label: 'Dashboard', icon: '⬡' },
-    { to: '/weather-map', label: 'Vremenska karta', icon: '🌍' },
-    { to: '/sensors', label: 'Senzori', icon: '📡' },
-    { to: '/history', label: 'Povijest', icon: '📈' },
-    { to: '/predictions', label: 'Predikcije', icon: '🔮' },
-    { to: '/evaluation', label: 'Evaluacija', icon: '📊' },
-    { to: '/alerts', label: 'Alarmi', icon: '🔔' },
+    { to: '/', label: 'Dashboard', icon: 'fa-solid fa-gauge-high' },
+    { to: '/map', label: 'Karta senzora', icon: 'fa-solid fa-map-location-dot' },
+    { to: '/sensors', label: 'Senzori', icon: 'fa-solid fa-satellite-dish' },
+    { to: '/history', label: 'Povijest', icon: 'fa-solid fa-chart-line' },
+    { to: '/predictions', label: 'Predikcije', icon: 'fa-solid fa-brain' },
+    { to: '/evaluation', label: 'Evaluacija', icon: 'fa-solid fa-chart-bar' },
+    { to: '/alerts', label: 'Alarmi', icon: 'fa-solid fa-bell' },
 ]
 
 function Layout() {
@@ -55,7 +55,8 @@ function Layout() {
                                 border: isActive ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent',
                             })}
                         >
-                            <span className="text-base">{item.icon}</span>
+                            <span className="text-base"><i className={item.icon} style={{ width: '16px', textAlign: 'center' }} />
+</span>
                             {item.label}
                         </NavLink>
                     ))}

@@ -30,7 +30,7 @@ namespace WeatherISAPI.Services
             while (!stoppingToken.IsCancellationRequested)
             {
                 await SimulateMeasurementsAsync();
-                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
             }
         }
 
@@ -64,10 +64,10 @@ namespace WeatherISAPI.Services
             var hour = DateTime.Now.Hour;
             var dailyTempCycle = Math.Sin((hour - 6) * Math.PI / 12) * 5;
 
-            baseline.Temperature += (_random.NextDouble() - 0.5) * 0.5;
-            baseline.Humidity += (_random.NextDouble() - 0.5) * 1.0;
-            baseline.Pressure += (_random.NextDouble() - 0.5) * 0.3;
-            baseline.WindSpeed += (_random.NextDouble() - 0.5) * 0.8;
+            baseline.Temperature += (_random.NextDouble() - 0.5) * 3.0;
+            baseline.Humidity += (_random.NextDouble() - 0.5) * 4.0;
+            baseline.Pressure += (_random.NextDouble() - 0.5) * 2.0;
+            baseline.WindSpeed += (_random.NextDouble() - 0.5) * 3.0;
 
             baseline.Temperature = Math.Clamp(baseline.Temperature, -20, 45);
             baseline.Humidity = Math.Clamp(baseline.Humidity, 10, 100);
@@ -94,10 +94,10 @@ namespace WeatherISAPI.Services
             {
                 _baselines[sensorId] = new SensorBaseline
                 {
-                    Temperature = _random.NextDouble() * 25 + 5,
-                    Humidity = _random.NextDouble() * 40 + 40,
-                    Pressure = _random.NextDouble() * 30 + 1000,
-                    WindSpeed = _random.NextDouble() * 20
+                    Temperature = _random.NextDouble() * 40 - 5,
+                    Humidity = _random.NextDouble() * 60 + 20,
+                    Pressure = _random.NextDouble() * 40 + 990,
+                    WindSpeed = _random.NextDouble() * 40
                 };
             }
             return _baselines[sensorId];

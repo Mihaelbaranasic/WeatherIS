@@ -6,5 +6,6 @@ namespace WeatherISCore.Interfaces
     {
         Task<IEnumerable<Alert>> GetActiveBySensorIdAsync(int sensorId);
         Task<IEnumerable<Alert>> GetAllActiveAsync();
+        Task<Alert?> GetActiveAlertAsync(int sensorId, string parameter);
     }
 }

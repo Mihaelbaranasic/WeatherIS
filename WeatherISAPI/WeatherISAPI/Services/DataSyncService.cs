@@ -1,4 +1,5 @@
-﻿using WeatherISCore.Entities;
+﻿using WeatherISCore.DTOs;
+using WeatherISCore.Entities;
 using WeatherISCore.Interfaces;
 using WeatherISDB;
 
@@ -107,6 +108,53 @@ namespace WeatherISAPI.Services
 
             await context.SaveChangesAsync();
             _logger.LogInformation("Čišćenje završeno.");
+        }
+        private async Task CheckAlertsAsync(List<WeatherDataDto> measurements, Sensor sensor, IAlertRepository alertRepo)
+        {
+            var thresholds = new List<(string param, double threshold, bool isUpperBound, string description)>
+    {
+        ("Temperature", 30.0, true, "Visoka temperatura"),
+        ("Temperature", 0.0, false, "Niska temperatura"),
+        ("WindSpeed", 50.0, true, "Jak vjetar"),
+        ("Precipitation", 5.0, true, "Intenzivne oborine"),
+        ("Pressure", 990.0, false, "Nizak tlak - moguća oluja"),
+        ("Humidity", 90.0, true, "Visoka vlažnost"),
+    };
+
+            foreach (var measurement in measurements)
+            {
+                foreach (var (param, threshold, isUpperBound, description) in thresholds)
+                {
+                    double value = param switch
+                    {
+                        "Temperature" => measurement.Temperature,
+                        "WindSpeed" => measurement.WindSpeed,
+                        "Precipitation" => measurement.Precipitation,
+                        "Pressure" => measurement.Pressure,
+                        "Humidity" => measurement.Humidity,
+                        _ => 0
+                    };
+
+                    bool triggered = isUpperBound ? value > threshold : value < threshold;
+
+                    if (triggered)
+                    {
+                        var existing = await alertRepo.GetActiveAlertAsync(sensor.Id, param);
+                        if (existing == null)
+                        {
+                            await alertRepo.AddAsync(new Alert
+                            {
+                                SensorId = sensor.Id,
+                                Parameter = param,
+                                ThresholdValue = threshold,
+                                MeasuredValue = value,
+                                TriggeredAt = measurement.Timestamp,
+                                IsResolved = false
+                            });
+                        }
+                    }
+                }
+            }
         }
     }
 }

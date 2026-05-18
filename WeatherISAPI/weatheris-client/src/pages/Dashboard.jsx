@@ -1,13 +1,25 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { weatherService } from '../services/api'
+import * as signalR from '@microsoft/signalr'
+
+function getWeatherIcon(temp) {
+    if (temp === null || temp === undefined) return '🌡️'
+    if (temp > 30) return '☀️'
+    if (temp > 20) return '🌤️'
+    if (temp > 10) return '⛅'
+    if (temp > 0) return '🌥️'
+    return '❄️'
+}
 
 function Dashboard() {
     const [sensorData, setSensorData] = useState([])
     const [loading, setLoading] = useState(true)
     const [lastUpdate, setLastUpdate] = useState(null)
+    const [connected, setConnected] = useState(false)
+    const connectionRef = useRef(null)
 
     useEffect(() => {
-        const fetchData = async () => {
+        const fetchInitial = async () => {
             try {
                 const res = await weatherService.getCurrentAll()
                 setSensorData(res.data)
@@ -18,10 +30,35 @@ function Dashboard() {
                 setLoading(false)
             }
         }
+        fetchInitial()
 
-        fetchData()
-        const interval = setInterval(fetchData, 60000)
-        return () => clearInterval(interval)
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl('https://localhost:7068/hubs/weather')
+            .withAutomaticReconnect()
+            .build()
+
+        connection.on('ReceiveWeatherUpdate', (data) => {
+            setSensorData(data)
+            setLastUpdate(new Date())
+        })
+
+        const startConnection = async () => {
+            try {
+                await connection.start()
+                await connection.invoke('JoinWeatherFeed')
+                setConnected(true)
+            } catch (err) {
+                console.error('SignalR greška:', err)
+            }
+        }
+
+        startConnection()
+        connectionRef.current = connection
+
+        return () => {
+            connection.invoke('LeaveWeatherFeed').catch(() => { })
+            connection.stop()
+        }
     }, [])
 
     if (loading) return (
@@ -45,16 +82,21 @@ function Dashboard() {
                         {lastUpdate && ` · Ažurirano ${lastUpdate.toLocaleTimeString('hr-HR')}`}
                     </p>
                 </div>
+                <div className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-full"
+                    style={{
+                        background: connected ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                        color: connected ? 'var(--accent-green)' : 'var(--accent-red)'
+                    }}>
+                    <div className="w-2 h-2 rounded-full" style={{ background: connected ? 'var(--accent-green)' : 'var(--accent-red)' }} />
+                    {connected ? 'SignalR povezan' : 'Nepovezan'}
+                </div>
             </div>
 
             {sensorData.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20">
                     <div className="text-5xl mb-4">🌐</div>
-                    <p className="text-lg font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+                    <p className="text-lg font-medium" style={{ color: 'var(--text-primary)' }}>
                         Nema aktivnih senzora
-                    </p>
-                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                        Dodaj senzore na stranici Senzori.
                     </p>
                 </div>
             ) : (
@@ -79,39 +121,42 @@ function Dashboard() {
                                 </span>
                             </div>
 
-                            <div className="text-3xl font-bold mb-3" style={{ color: 'var(--accent-blue)' }}>
-                                {item.weather.temperature}°C
+                            <div className="flex items-center gap-2 mb-3">
+                                <span className="text-3xl">{getWeatherIcon(item.weather?.temperature)}</span>
+                                <span className="text-3xl font-bold" style={{ color: 'var(--accent-blue)' }}>
+                                    {item.weather?.temperature}°C
+                                </span>
                             </div>
 
                             <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div className="rounded-lg p-2" style={{ background: 'var(--bg-secondary)' }}>
                                     <div style={{ color: 'var(--text-secondary)' }}>Vlažnost</div>
                                     <div className="font-medium mt-0.5" style={{ color: 'var(--text-primary)' }}>
-                                        {item.weather.humidity}%
+                                        {item.weather?.humidity}%
                                     </div>
                                 </div>
                                 <div className="rounded-lg p-2" style={{ background: 'var(--bg-secondary)' }}>
                                     <div style={{ color: 'var(--text-secondary)' }}>Tlak</div>
                                     <div className="font-medium mt-0.5" style={{ color: 'var(--text-primary)' }}>
-                                        {item.weather.pressure} hPa
+                                        {item.weather?.pressure} hPa
                                     </div>
                                 </div>
                                 <div className="rounded-lg p-2" style={{ background: 'var(--bg-secondary)' }}>
                                     <div style={{ color: 'var(--text-secondary)' }}>Vjetar</div>
                                     <div className="font-medium mt-0.5" style={{ color: 'var(--text-primary)' }}>
-                                        {item.weather.windSpeed} km/h
+                                        {item.weather?.windSpeed} km/h
                                     </div>
                                 </div>
                                 <div className="rounded-lg p-2" style={{ background: 'var(--bg-secondary)' }}>
                                     <div style={{ color: 'var(--text-secondary)' }}>Oborine</div>
                                     <div className="font-medium mt-0.5" style={{ color: 'var(--text-primary)' }}>
-                                        {item.weather.precipitation} mm
+                                        {item.weather?.precipitation} mm
                                     </div>
                                 </div>
                             </div>
 
                             <p className="text-xs mt-3" style={{ color: 'var(--text-secondary)' }}>
-                                {new Date(item.weather.timestamp).toLocaleString('hr-HR')}
+                                {lastUpdate?.toLocaleString('hr-HR')}
                             </p>
                         </div>
                     ))}

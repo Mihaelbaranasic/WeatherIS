@@ -203,5 +203,52 @@ namespace WeatherISAPI.Services
                 return new List<WeatherDataDto>();
             }
         }
+        public async Task<List<WeatherDataDto>> GetCurrentAllAsync(List<Sensor> sensors)
+        {
+            var latitudes = string.Join(",", sensors.Select(s =>
+                s.Latitude.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            var longitudes = string.Join(",", sensors.Select(s =>
+                s.Longitude.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+
+            var url = $"https://api.open-meteo.com/v1/forecast" +
+                      $"?latitude={latitudes}" +
+                      $"&longitude={longitudes}" +
+                      $"&current=temperature_2m,relative_humidity_2m,pressure_msl,wind_speed_10m,precipitation" +
+                      $"&timezone=Europe%2FBerlin";
+
+            try
+            {
+                var response = await _httpClient.GetStringAsync(url);
+                var jsonArray = JsonDocument.Parse(response);
+                var results = new List<WeatherDataDto>();
+
+                // Open-Meteo vraća array kad su višestruke lokacije
+                var elements = jsonArray.RootElement.ValueKind == JsonValueKind.Array
+                    ? jsonArray.RootElement.EnumerateArray().ToList()
+                    : new List<JsonElement> { jsonArray.RootElement };
+
+                for (int i = 0; i < elements.Count && i < sensors.Count; i++)
+                {
+                    var current = elements[i].GetProperty("current");
+                    results.Add(new WeatherDataDto
+                    {
+                        SensorId = sensors[i].Id,
+                        Timestamp = DateTime.UtcNow,
+                        Temperature = current.GetProperty("temperature_2m").GetDouble(),
+                        Humidity = current.GetProperty("relative_humidity_2m").GetDouble(),
+                        Pressure = current.GetProperty("pressure_msl").GetDouble(),
+                        WindSpeed = current.GetProperty("wind_speed_10m").GetDouble(),
+                        Precipitation = current.GetProperty("precipitation").GetDouble(),
+                        Source = "OpenMeteo"
+                    });
+                }
+
+                return results;
+            } catch (Exception ex)
+            {
+                _logger.LogError(ex, "Greška pri batch dohvatu trenutnih podataka");
+                return new List<WeatherDataDto>();
+            }
+        }
     }
 }

@@ -17,5 +17,13 @@ namespace WeatherISDB.Repositories
             => await _dbSet.Where(a => !a.IsResolved)
                            .OrderByDescending(a => a.TriggeredAt)
                            .ToListAsync();
+
+        public async Task<Alert?> GetActiveAlertAsync(int sensorId, string parameter)
+    => await _dbSet
+        .Where(a => a.SensorId == sensorId
+                 && a.Parameter == parameter
+                 && !a.IsResolved)
+        .OrderByDescending(a => a.TriggeredAt)
+        .FirstOrDefaultAsync();
     }
 }
