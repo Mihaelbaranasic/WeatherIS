@@ -250,5 +250,34 @@ namespace WeatherISAPI.Services
                 return new List<WeatherDataDto>();
             }
         }
+        public async Task<List<WeatherDataDto>> GetSeasonalTrainingDataAsync(int sensorId, double lat, double lon)
+        {
+            var allData = new List<WeatherDataDto>();
+            var today = DateTime.UtcNow.Date;
+
+            for (int yearOffset = 1; yearOffset <= 2; yearOffset++)
+            {
+                var centerDate = today.AddYears(-yearOffset);
+                var start = centerDate.AddDays(-75);
+                var end = centerDate.AddDays(75);
+
+                var data = await GetHistoricalDataAsync(
+                    sensorId, lat, lon, start, end);
+                allData.AddRange(data);
+                await Task.Delay(500);
+            }
+
+            var recentData = await GetHistoricalDataAsync(
+                sensorId, lat, lon,
+                today.AddDays(-60),
+                today.AddDays(-1));
+            allData.AddRange(recentData);
+
+            return allData
+                .OrderBy(d => d.Timestamp)
+                .GroupBy(d => d.Timestamp)
+                .Select(g => g.First())
+                .ToList();
+        }
     }
 }

@@ -149,16 +149,17 @@ namespace WeatherISAPI.Controllers
             var sensor = await _sensorRepository.GetByIdAsync(sensorId);
             if (sensor == null) return NotFound();
 
+            // Zadnjih 90 dana — ista sezona, nema distribucijskog pomaka
             var endDate = DateTime.UtcNow.Date.AddDays(-1);
-            var startDate = endDate.AddDays(-365);
+            var startDate = endDate.AddDays(-90);
 
             var historicalData = await _openMeteoService.GetHistoricalDataAsync(
                 sensorId, sensor.Latitude, sensor.Longitude, startDate, endDate);
 
-            var evaluation = _predictionService.EvaluateAllModels(historicalData);
+            if (historicalData.Count < 200)
+                return BadRequest("Nedovoljno podataka za evaluaciju.");
 
-            if (!evaluation.IsValid)
-                return BadRequest("Nedovoljno podataka za evaluaciju modela.");
+            var evaluation = _predictionService.EvaluateAllModels(historicalData);
 
             return Ok(evaluation);
         }
